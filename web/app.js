@@ -142,17 +142,34 @@ function toast(text) {
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
+    return true;
   } catch {
     // Plain http on the tailnet isn't a secure context, so the async clipboard API is missing there.
     const area = document.createElement("textarea");
     area.value = text;
     area.style.position = "fixed";
     area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    document.execCommand("copy");
+    // While a modal dialog is open the rest of the page is inert, and nothing in it can be selected.
+    (document.querySelector("dialog[open]") || document.body).append(area);
+    area.focus();
+    area.setSelectionRange(0, text.length);
+    const copied = document.execCommand("copy");
     area.remove();
+    return copied;
   }
+}
+
+// Shows `done` on the button for a moment once the text is copied, or says that it wasn't.
+async function copyWithLabel(btn, text, done = "Copied") {
+  if (btn.dataset.copied) return;
+  if (!(await copyText(text))) return toast("Couldn't copy. Select the text and copy it by hand.");
+  const label = btn.innerHTML;
+  btn.dataset.copied = "1";
+  btn.innerHTML = done;
+  setTimeout(() => {
+    btn.innerHTML = label;
+    delete btn.dataset.copied;
+  }, 1400);
 }
 
 function shortPath(path) {
@@ -161,6 +178,10 @@ function shortPath(path) {
   if (home && (path === home || path.startsWith(home + sep))) return "~" + path.slice(home.length);
   return path.replace(/^\/home\/[^/]+/, "~");
 }
+
+// Message times come from the computer's clock, which a phone's clock may not agree with.
+let clockSkew = 0;
+const serverNow = () => Date.now() + clockSkew;
 
 const fmtTokens = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `${n}`);
 
@@ -760,7 +781,7 @@ function statusLine(msg, text) {
 function updateStats(el, msg) {
   const stats = el.querySelector(".status-stats");
   if (!stats) return;
-  const secs = Math.max(0, Math.round((Date.now() - msg.ts) / 1000));
+  const secs = Math.max(0, Math.round((serverNow() - msg.ts) / 1000));
   const parts = [fmtDuration(secs * 1000)];
   if (state.live.tokens) parts.push(`↓ ${fmtTokens(state.live.tokens)} tokens`);
   if (!isPhone()) parts.push("esc to interrupt");
@@ -842,7 +863,14 @@ function fittedWidth(bubble) {
   lines.selectNodeContents(bubble);
   const rects = [...lines.getClientRects()];
   if (rects.length < 2) return "";
-  const text = Math.max(...rects.map((r) => r.right)) - Math.min(...rects.map((r) => r.left));
+  // A loop, since spreading a huge paste's rects into Math.max would pass more arguments than the engine allows.
+  let left = Infinity;
+  let right = -Infinity;
+  for (const r of rects) {
+    left = Math.min(left, r.left);
+    right = Math.max(right, r.right);
+  }
+  const text = right - left;
   const style = getComputedStyle(bubble);
   return `${Math.ceil(text + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)) + 1}px`;
 }
@@ -860,11 +888,7 @@ new MutationObserver((records) => {
 }).observe($("thread"), { childList: true });
 document.fonts.addEventListener("loadingdone", () => fitBubbles());
 
-function flashCopy(btn, text) {
-  copyText(text);
-  btn.innerHTML = icon("check");
-  setTimeout(() => (btn.innerHTML = icon("copy")), 1400);
-}
+const flashCopy = (btn, text) => copyWithLabel(btn, text, icon("check"));
 
 function planWaiting(msg, index) {
   const conv = state.current;
@@ -1170,23 +1194,42 @@ function rerenderBlock(i) {
   else blocks.append(fresh);
 }
 
+// Each render parses the whole block again, so a very long one is redrawn a few times a second, not every frame.
+const BIG_BLOCK = 20000;
+const BIG_BLOCK_MS = 120;
+let bigRenderAt = 0;
+
+function renderDirty() {
+  frameQueued = false;
+  const stick = pinned;
+  const blocks = state.current?.messages.at(-1)?.blocks || [];
+  const now = performance.now();
+  const wait = bigRenderAt + BIG_BLOCK_MS - now;
+  for (const index of [...dirty]) {
+    const big = (blocks[index]?.text?.length || 0) > BIG_BLOCK;
+    if (big && wait > 0) continue;
+    if (big) bigRenderAt = now;
+    dirty.delete(index);
+    rerenderBlock(index);
+  }
+  if (dirty.size) {
+    frameQueued = true;
+    setTimeout(() => requestAnimationFrame(renderDirty), wait);
+  }
+  if (stick) scrollToBottom(true);
+  else $("jump").hidden = false;
+}
+
 function scheduleRender(i) {
   dirty.add(i);
   if (frameQueued) return;
   frameQueued = true;
-  requestAnimationFrame(() => {
-    frameQueued = false;
-    const stick = pinned;
-    for (const index of dirty) rerenderBlock(index);
-    dirty.clear();
-    if (stick) scrollToBottom(true);
-    else $("jump").hidden = false;
-  });
+  requestAnimationFrame(renderDirty);
 }
 
 function settleMessage(msg) {
   for (const block of msg.blocks) {
-    if (block.type === "thinking" && !block.ended) block.ended = Date.now();
+    if (block.type === "thinking" && !block.ended) block.ended = serverNow();
     if (block.type === "tool" && block.state === "running") block.state = "done";
   }
 }
@@ -1316,6 +1359,19 @@ function handleEvent(ev) {
         }
       }
       break;
+    case "unsent": {
+      // The text goes back where it can be sent again: the box for the open chat, that chat's draft otherwise.
+      toast(`Your queued message wasn't sent: ${ev.error}`);
+      if (state.current?.id === ev.conv_id) {
+        $("input").value = [ev.text, $("input").value].filter(Boolean).join("\n\n");
+        autosize();
+        stashDraft();
+      } else {
+        drafts[ev.conv_id] = [ev.text, drafts[ev.conv_id]].filter(Boolean).join("\n\n");
+        localStorage.setItem("viola.drafts", JSON.stringify(drafts));
+      }
+      break;
+    }
     case "sessions":
       state.sessions = ev.sessions || [];
       renderSidebar();
@@ -1389,6 +1445,14 @@ function showNoLink() {
   document.body.innerHTML =
     '<p style="padding:2rem;font-family:var(--font-ui)">Viola needs its secret link to open. Use the app window, ' +
     "or copy the remote link from Settings on your computer.</p>";
+}
+
+// Only a refused token means the link is wrong; anything else is the backend being away, which a reload may fix.
+function showUnreachable() {
+  events?.close();
+  document.body.innerHTML =
+    '<p style="padding:2rem;font-family:var(--font-ui)">Viola\'s backend isn\'t answering. Check that Viola is ' +
+    'running on your computer, then <a href="">try again</a>.</p>';
 }
 
 async function resync() {
@@ -1844,6 +1908,31 @@ let openPop = null;
 let popAnchor = null;
 let popOptions = {};
 
+const MENUS = ".model-menu, .submenu, .plus-menu, .select-menu, .conv-menu";
+// A menu opened with the keyboard takes focus; one opened with the mouse doesn't, since WebKitGTK would draw a focus ring.
+let keyboardLast = false;
+document.addEventListener("keydown", () => (keyboardLast = true), true);
+document.addEventListener("pointerdown", () => (keyboardLast = false), true);
+
+const menuItems = (menu) =>
+  [...menu.querySelectorAll("button:not(:disabled)")].filter((b) => b.getClientRects().length);
+
+function focusMenu(menu) {
+  const items = menuItems(menu);
+  (items.find((b) => b.classList.contains("selected")) || items[0])?.focus();
+}
+
+function moveInMenu(key) {
+  const menu = document.activeElement?.closest(MENUS) || openPop;
+  const items = menuItems(menu);
+  const at = items.indexOf(document.activeElement);
+  const down = key === "ArrowDown";
+  let next = (at + (down ? 1 : -1) + items.length) % items.length;
+  if (key === "Home" || (at < 0 && down)) next = 0;
+  if (key === "End" || (at < 0 && !down)) next = items.length - 1;
+  items[next]?.focus();
+}
+
 function showPopover(pop, anchor, options = {}) {
   closePopover(true);
   // A modal dialog sits in the top layer, so anything opened from inside it has to live inside it too.
@@ -1869,6 +1958,7 @@ function showPopover(pop, anchor, options = {}) {
     pop.hidden = false;
     placePopover();
     snapToPixels();
+    if (keyboardLast && pop.matches(MENUS)) focusMenu(pop);
   }
 }
 
@@ -1928,6 +2018,7 @@ function closeDialog(dialog) {
 function closePopover(instant = false) {
   closeMoreModels(true);
   const pop = openPop;
+  if (keyboardLast && pop && document.activeElement?.closest(MENUS)) popAnchor?.focus();
   openPop = null;
   popAnchor = null;
   $("plus-btn").setAttribute("aria-expanded", "false");
@@ -2162,6 +2253,7 @@ function openMoreModels(row) {
   more.style.top = `${Math.round(Math.max(8, Math.min(r.top - 6, innerHeight - h - 8)))}px`;
   more.style.setProperty("--origin", `top ${right ? "left" : "right"}`);
   row.setAttribute("aria-expanded", "true");
+  if (menu.contains(document.activeElement)) focusMenu(more);
 }
 
 // Shrinks away the way it popped in, unless the whole menu is closing with it.
@@ -2531,10 +2623,7 @@ function bindSetup() {
     const key = $("setup-admin").value.trim();
     if (key && (await setupPatch({ admin_key: key }, "setup-admin-msg"))) $("setup-admin").value = "";
   });
-  $("copy-install").onclick = (e) => {
-    copyText($("install-cmd").textContent);
-    e.currentTarget.textContent = "Copied";
-  };
+  $("copy-install").onclick = (e) => copyWithLabel(e.currentTarget, $("install-cmd").textContent);
   $("recheck").onclick = async () => {
     state.settings = await api("POST", "setup/recheck");
     renderSetup();
@@ -2562,6 +2651,7 @@ function bindSetup() {
 
 async function loadState() {
   const data = await api("GET", "state");
+  if (data.now) clockSkew = data.now - Date.now();
   state.settings = data.settings;
   state.credits = data.credits;
   state.convs = data.conversations;
@@ -2984,11 +3074,7 @@ function bind() {
     else localStorage.removeItem("viola.matchIcon");
     applyTheme();
   });
-  $("copy-remote").onclick = (e) => {
-    copyText(state.settings.remote_url);
-    e.currentTarget.textContent = "Copied";
-    setTimeout(() => ($("copy-remote").textContent = "Copy link"), 1400);
-  };
+  $("copy-remote").onclick = (e) => copyWithLabel(e.currentTarget, state.settings.remote_url);
   // A new link stops the old one working everywhere, so it takes a second click.
   $("reset-remote").onclick = async (e) => {
     const btn = e.currentTarget;
@@ -3022,9 +3108,7 @@ function bind() {
     }
     const copyBtn = e.target.closest(".code-copy");
     if (copyBtn) {
-      copyText(copyBtn.closest(".code-block").querySelector("pre").textContent);
-      copyBtn.textContent = "Copied";
-      setTimeout(() => (copyBtn.textContent = "Copy"), 1400);
+      copyWithLabel(copyBtn, copyBtn.closest(".code-block").querySelector("pre").textContent);
       return;
     }
     const head = e.target.closest(".step-head");
@@ -3065,6 +3149,13 @@ function bind() {
       }
       if (!$("slash-menu").hidden) return closeSlash();
       if (state.current?.running) return stop();
+    }
+    if (openPop?.matches(MENUS) && !e.target.matches("input, textarea")) {
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+        e.preventDefault();
+        return moveInMenu(e.key);
+      }
+      if (e.key === "Tab" && openPop.contains(document.activeElement)) closePopover();
     }
     if (mod && e.shiftKey && e.key.toLowerCase() === "o") {
       e.preventDefault();
@@ -3110,8 +3201,8 @@ async function boot() {
   bindSetup();
   try {
     await loadState();
-  } catch {
-    return showNoLink();
+  } catch (err) {
+    return err.status === 401 ? showNoLink() : showUnreachable();
   }
   connectEvents();
   if (state.settings.needs_setup) {

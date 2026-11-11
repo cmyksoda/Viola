@@ -1,6 +1,6 @@
 # Viola
 
-A small desktop app for interacting with Claude Code while using API credits. Designed for Max and Ultra subscribers to get the most out of their monthly $100/$200 in API credits, while still working in a similar workflow to how they normally would.
+A small desktop app for interacting with Claude Code while using API credits. Designed for Max and Ultra subscribers to get the most out of their monthly $100/$200 in API credits, while still working similar to how they normally would.
 
 <picture>
   <source media="(max-width: 640px)" srcset="assets/screenshots/mobile.png">
@@ -24,9 +24,10 @@ Viola keeps Claude Code's input open while it works (`--input-format stream-json
 
 ## Installing
 
-Viola needs [Claude Code](https://docs.claude.com/en/docs/claude-code) and an Anthropic API key.
+Viola needs [Claude Code](https://docs.claude.com/en/docs/claude-code) and an Anthropic API key on the computer it runs on. Phones connect to that computer, so set up a computer first. Pick your system:
 
-### Linux
+<details>
+<summary><b>Linux</b></summary>
 
 Download the package for your system from the [latest release](https://github.com/cmyksoda/Viola/releases/latest) and install it. Your package manager will resolve all dependencies (Python 3, GTK 3, WebKit2GTK 4.1):
 
@@ -35,8 +36,6 @@ sudo dnf install ./viola-1.0.0-1.noarch.rpm   # Fedora
 sudo apt install ./viola_1.0.0_all.deb        # Ubuntu, Debian
 ```
 
-`packaging/build.sh` builds both. The Android app is built with `android/build.sh`.
-
 To run from the source folder instead:
 
 ```sh
@@ -44,16 +43,18 @@ To run from the source folder instead:
 viola           # opens the window
 ```
 
-This needs Python 3, GTK 3 and WebKit2GTK 4.1 (`webkit2gtk4.1` on Fedora), and the `claude` CLI.
+This needs Python 3, GTK 3 and WebKit2GTK 4.1 (`webkit2gtk4.1` on Fedora), and the `claude` CLI. `packaging/build.sh` builds the .rpm and .deb.
 
-### macOS and Windows
+</details>
 
-Download Viola from the [latest release](https://github.com/cmyksoda/Viola/releases/latest): `Viola-macOS-Apple-Silicon.zip` or `Viola-macOS-Intel.zip` for a Mac, and `Viola.exe` for Windows. Python comes inside, so there's nothing else to install apart from Claude Code.
+<details>
+<summary><b>macOS</b></summary>
 
-- **macOS:** unzip it and move Viola to Applications. The first time you open it, macOS says it can't check Viola for malware, since it isn't signed with a paid Apple developer account. Open System Settings → Privacy & Security, scroll down, and choose **Open Anyway**. After that it opens like any other app.
-- **Windows:** double-click `Viola.exe`. If Windows says it protected your PC, choose **More info** → **Run anyway**. Viola's window uses Microsoft Edge's WebView2, which comes with Windows 11 and up-to-date Windows 10.
+Download `Viola-macOS-Apple-Silicon.zip` or `Viola-macOS-Intel.zip` from the [latest release](https://github.com/cmyksoda/Viola/releases/latest). Python comes inside, so there's nothing else to install apart from Claude Code.
 
-To run from the source folder instead, you need Python 3.9 or newer. Viola's window comes from [pywebview](https://pywebview.flowrl.com/), which uses the web view the system already has (Safari's on macOS, Edge's on Windows):
+Unzip it and move Viola to Applications. The first time you open it, macOS says it can't check Viola for malware, since it isn't signed with a paid Apple developer account. Open System Settings → Privacy & Security, scroll down, and choose **Open Anyway**. After that it opens like any other app.
+
+To run from the source folder instead, you need Python 3.9 or newer. Viola's window comes from [pywebview](https://pywebview.flowrl.com/), which uses Safari's web view. Without pywebview, Viola opens in your browser instead.
 
 ```sh
 python3 -m venv .venv
@@ -61,7 +62,51 @@ python3 -m venv .venv
 .venv/bin/python viola.py
 ```
 
-On Windows, use Python from [python.org](https://www.python.org/downloads/windows/) (the Microsoft Store version keeps its own copy of `%APPDATA%`). The same steps are `py -m venv .venv`, `.venv\Scripts\pip install -r requirements.txt` and `.venv\Scripts\pythonw viola.py`. `pythonw` starts Viola without a console window, which also hides its messages, so use `python` instead if something goes wrong. Without pywebview, Viola opens in your browser instead.
+</details>
+
+<details>
+<summary><b>Windows</b></summary>
+
+Download `Viola.exe` from the [latest release](https://github.com/cmyksoda/Viola/releases/latest) and double-click it. Python comes inside, so there's nothing else to install apart from Claude Code. If Windows says it protected your PC, choose **More info** → **Run anyway**. Viola's window uses Microsoft Edge's WebView2, which comes with Windows 11 and up-to-date Windows 10.
+
+To run from the source folder instead, you need Python 3.9 or newer from [python.org](https://www.python.org/downloads/windows/) (the Microsoft Store version keeps its own copy of `%APPDATA%`). Viola's window comes from [pywebview](https://pywebview.flowrl.com/). Without it, Viola opens in your browser instead.
+
+```bat
+py -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\pythonw viola.py
+```
+
+`pythonw` starts Viola without a console window, which also hides its messages, so use `python` instead if something goes wrong.
+
+</details>
+
+<details>
+<summary><b>Android</b></summary>
+
+The Android app is a remote for Viola on your computer. Claude Code's own `/remote-control` refuses API keys, so Viola shares its own page with your phone instead.
+
+1. Download `viola-1.0.0.apk` from the [latest release](https://github.com/cmyksoda/Viola/releases/latest) and install it.
+2. In Viola on your computer, open Settings → Remote and copy the link. With [Tailscale](https://tailscale.com/) on both devices, the link works from anywhere, over HTTPS when your tailnet has certificates enabled (plain HTTP on the Tailscale IP otherwise). Without Tailscale, Viola listens on your home network instead, so the phone has to be on the same Wi-Fi, and the link isn't encrypted: anyone on that network who can see the traffic could use it to control Viola, and through Viola your computer. Only use it on a network you trust. Sharing on the home network stays off after Viola restarts, since a laptop may be somewhere else by then.
+3. Open the app and paste the link on first launch.
+
+`android/build.sh` builds the app from source.
+
+</details>
+
+<details>
+<summary><b>iOS</b></summary>
+
+There's no App Store app. An iPhone or iPad opens Viola's own page from your computer, which Viola shares because Claude Code's own `/remote-control` refuses API keys.
+
+1. In Viola on your computer, open Settings → Remote and copy the link. With [Tailscale](https://tailscale.com/) on both devices, the link works from anywhere, over HTTPS when your tailnet has certificates enabled (plain HTTP on the Tailscale IP otherwise). Without Tailscale, Viola listens on your home network instead, so the phone has to be on the same Wi-Fi, and the link isn't encrypted: anyone on that network who can see the traffic could use it to control Viola, and through Viola your computer. Only use it on a network you trust. Sharing on the home network stays off after Viola restarts, since a laptop may be somewhere else by then.
+2. Open the link in Safari, then choose Share → **Add to Home Screen**.
+
+Any other device with a browser can open the same link.
+
+</details>
+
+Every request from a phone needs the secret token that's in its link. Settings → Remote can reset the link, which stops the old one from working.
 
 ### Options
 
@@ -70,13 +115,6 @@ On Windows, use Python from [python.org](https://www.python.org/downloads/window
 ### Your API key
 
 Paste your key into Viola's setup screen or Settings, or set `VIOLA_API_KEY`. An `export VIOLA_API_KEY=…` line in `~/.bashrc` or `~/.zshrc` works too, even when Viola starts from the app menu. Viola has its own variable so that Claude Code in your terminal can stay on your subscription; `ANTHROPIC_API_KEY` is only used when nothing else is set.
-
-## From your phone
-
-Claude Code's own `/remote-control` refuses API keys, so instead, Settings → Remote shares Viola's own page with your phone. Tailscale is recommended: Viola shares the page on your tailnet with `tailscale serve`, so it works from anywhere, over HTTPS when the tailnet has certificates enabled (plain HTTP on the Tailscale IP otherwise). Without Tailscale, Viola listens on your home network instead, so the phone has to be on the same Wi-Fi, and the link isn't encrypted: anyone on that network who can see the traffic could use it to control Viola, and through Viola your computer. Only use it on a network you trust. Sharing on the home network stays off after Viola restarts, since a laptop may be somewhere else by then. Every API call needs the secret token that's in the link.
-
-- **Android**: Open the Android app, and paste the link on first launch.
-- **iPhone, or any browser**: Open the link, then Add to Home Screen.
 
 ## Shortcuts
 

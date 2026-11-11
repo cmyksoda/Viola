@@ -277,7 +277,7 @@ button:disabled { cursor: default; }
 }
 
 /* Layout */
-.app { display: flex; height: 100dvh; }
+.app { display: flex; height: 100vh; height: 100dvh; }
 
 .sidebar {
   width: var(--sidebar-w);

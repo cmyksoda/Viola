@@ -1427,6 +1427,7 @@ class App:
             self.send(conv, text, attachments=attachments)
         except ValueError as exc:
             print("viola: couldn't send queued message:", exc, flush=True)
+            self.hub.emit({"t": "unsent", "conv_id": conv["id"], "text": text, "error": str(exc)})
 
     def make_title(self, conv, text):
         args = [
@@ -1785,6 +1786,7 @@ class Handler(BaseHTTPRequestHandler):
                     "sessions": app.terminal_sessions(),
                     "settings": app.settings(),
                     "credits": app.credits(),
+                    "now": now_ms(),
                 })
             if parts == ["sessions"]:
                 app.sessions_wake.set()

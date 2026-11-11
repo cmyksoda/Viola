@@ -55,7 +55,8 @@ function inline(text, stash = [], autolink = true) {
   text = text.replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, (_, __, code) =>
     keep(`<code>${escapeHtml(code.trim())}</code>`),
   );
-  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (all, label, url) => {
+  // The label stays on one line, or a reply full of unmatched "[" makes every render scan to the end of the text.
+  text = text.replace(/\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (all, label, url) => {
     const ok = safeUrl(url);
     if (!ok) return all;
     return keep(`<a href="${escapeHtml(ok)}" target="_blank" rel="noreferrer">${inline(label, stash, false)}</a>`);
