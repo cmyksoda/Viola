@@ -43,7 +43,8 @@ def data_dir():
 
 
 APP_DIR = Path(__file__).resolve().parent
-WEB_DIR = APP_DIR / "web"
+# Resolved because a macOS app bundle keeps web/ behind a symlink, and serve_static compares resolved paths.
+WEB_DIR = (APP_DIR / "web").resolve()
 DATA_DIR = data_dir()
 CONV_DIR = DATA_DIR / "conversations"
 CONFIG_PATH = DATA_DIR / "config.json"

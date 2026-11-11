@@ -3,7 +3,7 @@ Version:        %{viola_version}
 Release:        1
 Summary:        A claude.ai-style window for Claude Code on API credits
 License:        GPL-3.0-or-later AND OFL-1.1 AND Cronyx
-URL:            https://github.com/cmyksoda/viola
+URL:            https://github.com/cmyksoda/Viola
 BuildArch:      noarch
 Requires:       python3 >= 3.10
 Requires:       python3-gobject

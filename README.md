@@ -28,14 +28,14 @@ Viola needs [Claude Code](https://docs.claude.com/en/docs/claude-code) and an An
 
 ### Linux
 
-Install the package for your system and your package manager will resolve all dependencies (Python 3, GTK 3, WebKit2GTK 4.1):
+Download the package for your system from the [latest release](https://github.com/cmyksoda/Viola/releases/latest) and install it. Your package manager will resolve all dependencies (Python 3, GTK 3, WebKit2GTK 4.1):
 
 ```sh
 sudo dnf install ./viola-1.0.0-1.noarch.rpm   # Fedora
 sudo apt install ./viola_1.0.0_all.deb        # Ubuntu, Debian
 ```
 
-`packaging/build.sh` builds both (the .deb inside a Debian container). The Android app is built with `android/build.sh`.
+`packaging/build.sh` builds both. The Android app is built with `android/build.sh`.
 
 To run from the source folder instead:
 
@@ -48,7 +48,7 @@ This needs Python 3, GTK 3 and WebKit2GTK 4.1 (`webkit2gtk4.1` on Fedora), and t
 
 ### macOS and Windows
 
-Download Viola from the [latest release](https://github.com/cmyksoda/viola/releases/latest): `Viola-macOS-Apple-Silicon.zip` or `Viola-macOS-Intel.zip` for a Mac, and `Viola.exe` for Windows. Python comes inside, so there's nothing else to install apart from Claude Code.
+Download Viola from the [latest release](https://github.com/cmyksoda/Viola/releases/latest): `Viola-macOS-Apple-Silicon.zip` or `Viola-macOS-Intel.zip` for a Mac, and `Viola.exe` for Windows. Python comes inside, so there's nothing else to install apart from Claude Code.
 
 - **macOS:** unzip it and move Viola to Applications. The first time you open it, macOS says it can't check Viola for malware, since it isn't signed with a paid Apple developer account. Open System Settings → Privacy & Security, scroll down, and choose **Open Anyway**. After that it opens like any other app.
 - **Windows:** double-click `Viola.exe`. If Windows says it protected your PC, choose **More info** → **Run anyway**. Viola's window uses Microsoft Edge's WebView2, which comes with Windows 11 and up-to-date Windows 10.

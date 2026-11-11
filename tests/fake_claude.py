@@ -12,9 +12,25 @@ log_path = os.environ.get("VIOLA_TEST_LOG")
 
 
 def log(kind, value):
-    if log_path:
+    if not log_path:
+        return
+    # Windows appends aren't atomic, so two stand-ins writing at once could overwrite each other's line.
+    lock = log_path + ".lock"
+    deadline = time.time() + 2
+    while time.time() < deadline:
+        try:
+            os.mkdir(lock)
+            break
+        except FileExistsError:
+            time.sleep(0.005)
+    try:
         with open(log_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps({"pid": os.getpid(), kind: value}) + "\n")
+    finally:
+        try:
+            os.rmdir(lock)
+        except OSError:
+            pass
 
 
 def out(event):
