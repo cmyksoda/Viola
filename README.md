@@ -106,11 +106,9 @@ Any other device with a browser can open the same link.
 
 </details>
 
-Every request from a phone needs the secret token that's in its link. Settings → Remote can reset the link, which stops the old one from working.
-
 ### Options
 
-`viola --server-only` (or `viola.py --server-only`) runs only the backend, for example to keep it up for your phone. `--browser` opens the UI in your default browser instead. If a backend is already running, the window attaches to it.
+`viola --server-only` (or `viola.py --server-only`) runs only the backend, for example, to keep it up for your phone. `--browser` opens the UI in your default browser instead. If a backend is already running, the window attaches to it.
 
 ### Your API key
 
@@ -128,16 +126,6 @@ Paste your key into Viola's setup screen or Settings, or set `VIOLA_API_KEY`. An
 | `/` at the start | Slash command menu (skills and commands from Claude Code) |
 
 On macOS, ⌘ works in place of Ctrl.
-
-## Platforms
-
-Viola is built and used daily on Linux (Fedora, KDE). macOS and Windows are supported: every push runs the backend's tests on Linux, macOS and Windows, and opens Viola's window on macOS and Windows ([tests.yml](.github/workflows/tests.yml)). Viola hasn't had day-to-day use on them yet, though, so reports are very welcome. Phones of any kind work through the remote link.
-
-A few things differ by system:
-
-- **Notifications** when a reply finishes while Viola is in the background: Linux and macOS.
-- **Match app icon to theme:** Linux (and the Android app).
-- **Open in terminal:** your terminal emulator on Linux, Terminal (or whichever app opens `.command` files) on macOS, and Command Prompt on Windows, which opens in Windows Terminal when that's your default.
 
 ## Notes
 
