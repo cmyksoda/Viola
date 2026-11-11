@@ -159,7 +159,6 @@ async function copyText(text) {
   }
 }
 
-// Shows `done` on the button for a moment once the text is copied, or says that it wasn't.
 async function copyWithLabel(btn, text, done = "Copied") {
   if (btn.dataset.copied) return;
   if (!(await copyText(text))) return toast("Couldn't copy. Select the text and copy it by hand.");
@@ -1368,7 +1367,7 @@ function handleEvent(ev) {
         stashDraft();
       } else {
         drafts[ev.conv_id] = [ev.text, drafts[ev.conv_id]].filter(Boolean).join("\n\n");
-        localStorage.setItem("viola.drafts", JSON.stringify(drafts));
+        saveDrafts();
       }
       break;
     }
@@ -1468,11 +1467,13 @@ let openCount = 0;
 const drafts = JSON.parse(localStorage.getItem("viola.drafts") || "{}");
 const draftKey = () => state.current?.id || "new";
 
+const saveDrafts = () => localStorage.setItem("viola.drafts", JSON.stringify(drafts));
+
 function stashDraft() {
   const text = $("input").value;
   if (text.trim()) drafts[draftKey()] = text;
   else delete drafts[draftKey()];
-  localStorage.setItem("viola.drafts", JSON.stringify(drafts));
+  saveDrafts();
 }
 
 function restoreDraft() {
@@ -1909,7 +1910,8 @@ let popAnchor = null;
 let popOptions = {};
 
 const MENUS = ".model-menu, .submenu, .plus-menu, .select-menu, .conv-menu";
-// A menu opened with the keyboard takes focus; one opened with the mouse doesn't, since WebKitGTK would draw a focus ring.
+// A menu opened with the keyboard takes focus; one opened with the mouse doesn't, since WebKitGTK would draw a
+// focus ring.
 let keyboardLast = false;
 document.addEventListener("keydown", () => (keyboardLast = true), true);
 document.addEventListener("pointerdown", () => (keyboardLast = false), true);
