@@ -1,0 +1,2 @@
+# Viola's window on macOS and Windows. Linux uses GTK and WebKitGTK from the system instead.
+pywebview>=6; sys_platform != "linux"

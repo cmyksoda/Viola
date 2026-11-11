@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Viola
+GenericName=Claude Code GUI for API usage
+Comment=Chat with Claude Code on API credits
+Exec=python3 @APP@
+Icon=viola
+Terminal=false
+Categories=Network;Chat;Development;
+StartupWMClass=viola
+StartupNotify=true

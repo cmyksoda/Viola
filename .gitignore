@@ -1,0 +1,8 @@
+__pycache__/
+project-notes/
+project-data/
+android/build/
+packaging/build/
+.venv/
+NOTE*.txt
+Screenshot_*.png

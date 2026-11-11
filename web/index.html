@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en" data-mode="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#262624">
+  <title>Viola</title>
+  <link rel="icon" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script>
+    {
+      const choice = localStorage.getItem("viola.theme") || "system";
+      const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+      const root = document.documentElement;
+      root.dataset.theme = choice === "system" ? (dark ? "clay-dark" : "clay-light") : choice;
+      root.dataset.mode = choice === "system"
+        ? (dark ? "dark" : "light")
+        : localStorage.getItem("viola.mode") || "light";
+    }
+  </script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="themes.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <span class="wordmark">Viola</span>
+        <div class="sidebar-tools">
+          <button class="icon-btn" id="open-search" title="Search chats (Ctrl+K)" data-icon="search"></button>
+          <button class="icon-btn" id="collapse-sidebar" title="Close sidebar (Ctrl+B)" data-icon="sidebar"></button>
+        </div>
+      </div>
+      <button class="new-chat" id="new-chat" title="New chat (Ctrl+Shift+O)">
+        <span class="new-chat-plus" data-icon="plus"></span>
+        <span>New chat</span>
+      </button>
+      <nav class="conv-list" id="conv-list"></nav>
+      <button class="profile" id="open-settings" title="Settings">
+        <span class="avatar" id="avatar">J</span>
+        <span class="profile-text">
+          <span class="profile-name" id="profile-name"></span>
+          <span class="profile-sub" id="profile-sub">API credits</span>
+        </span>
+        <span class="profile-gear" data-icon="settings"></span>
+      </button>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn" id="expand-sidebar" title="Open sidebar (Ctrl+B)" data-icon="sidebar"></button>
+        <div class="title-wrap">
+          <button class="conv-title" id="conv-title" title="Rename"></button>
+          <input class="conv-title-input" id="conv-title-input" maxlength="120" hidden>
+        </div>
+        <div class="topbar-right">
+          <button class="icon-btn" id="conv-menu-btn" title="Chat options" data-icon="dots" hidden></button>
+          <button class="credits" id="credits" title="API credits">
+            <span class="credits-dot"></span>
+            <span class="odometer" id="odometer"></span>
+          </button>
+        </div>
+      </header>
+
+      <section class="scroller" id="scroller">
+        <div class="welcome" id="welcome" hidden>
+          <h1 class="greeting"><span class="spark-slot" id="welcome-spark"></span><span id="greeting-text"></span></h1>
+        </div>
+        <div class="thread" id="thread"></div>
+      </section>
+
+      <footer class="composer-wrap" id="composer-wrap">
+        <button class="jump" id="jump" title="Jump to latest" data-icon="arrow-down" hidden></button>
+        <div class="slash-menu" id="slash-menu" hidden></div>
+        <div class="live-note" id="live-note" hidden></div>
+        <form class="composer" id="composer">
+          <div class="tray" id="tray" hidden></div>
+          <textarea id="input" rows="1" placeholder="How can I help you today?" spellcheck="true"></textarea>
+          <div class="composer-row">
+            <div class="composer-left">
+              <button type="button" class="chip" id="cwd-chip" title="Working folder">
+                <span class="chip-icon" data-icon="folder"></span><span class="chip-label" id="cwd-label"></span>
+              </button>
+              <button type="button" class="plus-btn" id="plus-btn"
+                title="Add photos and files, or change the mode" data-icon="plus"></button>
+              <button type="button" class="chip mode-chip" id="mode-chip" title="Mode" hidden>
+                <span class="chip-icon" data-icon="shield"></span><span class="chip-label" id="mode-label">Auto</span>
+              </button>
+            </div>
+            <div class="composer-right">
+              <button type="button" class="model-btn" id="model-btn">
+                <span id="model-label"></span><span class="effort-tag"
+                  id="effort-label"></span><span data-icon="chevron"></span>
+              </button>
+              <button type="button" class="send stop" id="stop" title="Stop (Esc)" data-icon="stop" hidden></button>
+              <button type="submit" class="send" id="send" title="Send (Enter)" data-icon="arrow-up" disabled></button>
+            </div>
+          </div>
+        </form>
+        <div class="composer-note" id="composer-note"><span class="assistant-name">Claude</span> can run commands and
+          edit files in the working folder.</div>
+      </footer>
+    </main>
+  </div>
+
+  <div class="sheet-scrim" id="sheet-scrim" hidden></div>
+  <div class="popover model-menu" id="model-menu" hidden></div>
+  <div class="popover submenu" id="model-more" hidden></div>
+  <div class="popover plus-menu" id="plus-menu" hidden></div>
+  <input type="file" id="pick-camera" accept="image/*" capture="environment" hidden>
+  <input type="file" id="pick-photos" accept="image/*" multiple hidden>
+  <input type="file" id="pick-files" multiple hidden>
+  <div class="lightbox" id="lightbox" hidden><img id="lightbox-img" alt=""></div>
+  <div class="popover select-menu" id="select-menu" hidden></div>
+  <div class="popover cwd-pop" id="cwd-pop" hidden>
+    <div class="pop-title">Working folder</div>
+    <div class="cwd-browser" id="cwd-browser">
+      <div class="cwd-path">
+        <button type="button" class="icon-btn" id="cwd-up" title="Up one folder" data-icon="arrow-up-left"></button>
+        <span id="cwd-path"></span>
+      </div>
+      <div class="cwd-list" id="cwd-list"></div>
+      <div class="cwd-actions">
+        <input id="cwd-input" class="text-input" spellcheck="false" autocomplete="off" placeholder="Or type a path…">
+        <button type="button" class="btn primary" id="cwd-use">Use this folder</button>
+      </div>
+    </div>
+    <p class="pop-note" id="cwd-note"></p>
+  </div>
+  <div class="popover conv-menu" id="conv-menu" hidden>
+    <button data-action="rename"><span data-icon="pencil"></span>Rename</button>
+    <button data-action="terminal"><span data-icon="terminal"></span>Open in terminal</button>
+    <button data-action="delete" class="danger"><span data-icon="trash"></span><span
+      class="delete-label">Delete</span></button>
+  </div>
+  <div class="popover rename-pop" id="rename-pop" hidden>
+    <div class="pop-title">Rename chat</div>
+    <form class="rename-form" id="rename-form">
+      <input id="rename-input" class="text-input" maxlength="120" autocomplete="off" spellcheck="false">
+      <button class="btn primary" type="submit">Save</button>
+    </form>
+  </div>
+  <div class="popover credits-pop" id="credits-pop" hidden>
+    <div class="credits-pop-head">
+      <span>API credits</span>
+      <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noreferrer">Billing ↗</a>
+    </div>
+    <div class="credits-big" id="credits-big"></div>
+    <form id="credits-form" class="credits-form">
+      <label class="money-field"><span class="dollar">$</span><input id="credits-input" inputmode="decimal"
+        autocomplete="off" placeholder="Balance from the Console"></label>
+      <button class="btn primary" type="submit">Set</button>
+    </form>
+    <p class="pop-note" id="credits-pending" hidden></p>
+    <p class="pop-note" id="credits-note"></p>
+  </div>
+
+  <dialog class="settings" id="settings">
+    <form method="dialog" class="settings-inner" id="settings-form">
+      <div class="settings-head">
+        <h2>Settings</h2>
+        <button class="icon-btn" value="close" data-icon="x" title="Close"></button>
+      </div>
+      <div class="settings-body">
+        <section>
+          <h3>You</h3>
+          <label class="row"><span>Your name</span><input class="text-input" name="name"></label>
+          <label class="row"><span>Assistant name</span><input class="text-input" name="assistant_name"
+            placeholder="Claude"></label>
+          <div class="row"><span>Theme</span><select class="kselect" name="theme"></select></div>
+          <div id="icon-setting" hidden>
+            <label class="row toggle-row"><span class="icon-label"><span class="icon-preview" id="icon-preview"><svg
+              viewBox="0 0 128 128" aria-hidden="true"><g transform="translate(64 64) scale(3.7)"><path id="petal-long"
+              d="M0,-1.6C1.2375,-4.3 2.25,-5.5375 2.25,-8.35A2.25,2.25 0 0 0 -2.25,-8.35C-2.25,-5.5375 -1.2375,-4.3 0,-1.6Z"/><path
+              id="petal-short" transform="rotate(45)"
+              d="M0,-1.6C0.9625,-3.34 1.75,-3.4625 1.75,-5.65A1.75,1.75 0 0 0 -1.75,-5.65C-1.75,-3.4625 -0.9625,-3.34 0,-1.6Z"/><use
+              href="#petal-long" transform="rotate(90)"/><use href="#petal-short" transform="rotate(90)"/><use
+              href="#petal-long" transform="rotate(180)"/><use href="#petal-short" transform="rotate(180)"/><use
+              href="#petal-long" transform="rotate(270)"/><use href="#petal-short"
+              transform="rotate(270)"/></g></svg></span>Match app icon to theme</span><input type="checkbox"
+              class="toggle" id="match-icon"></label>
+            <p class="pop-note" id="icon-note"></p>
+          </div>
+        </section>
+        <section>
+          <h3>Account</h3>
+          <div class="row"><span>Key in use</span><span class="key-line"><code id="key-hint"
+            class="key-hint"></code><button type="button" class="link-btn" id="forget-key"
+            hidden>Remove</button></span></div>
+          <div class="row" id="admin-set-row" hidden><span>Admin key</span><span class="key-line"><code id="admin-hint"
+            class="key-hint"></code><button type="button" class="link-btn"
+            id="forget-admin">Remove</button></span></div>
+          <label class="row" id="admin-input-row"><span>Admin key for billed costs</span><input class="text-input"
+            name="admin_key" type="password" placeholder="Optional: admin or org-wide key" autocomplete="off"></label>
+          <p class="pop-note" id="admin-note"></p>
+          <label class="row"><span>Replace key</span><input class="text-input" name="api_key" type="password"
+            placeholder="sk-ant-…" autocomplete="off"></label>
+        </section>
+        <section>
+          <h3>Claude Code</h3>
+          <label class="row"><span>New chats start in</span><input class="text-input" name="cwd"
+            spellcheck="false"></label>
+          <div class="row"><span>Mode for new chats</span>
+            <select class="kselect" name="permission_mode" data-style="menu">
+              <option value="auto">Auto</option>
+              <option value="acceptEdits">Accept edits</option>
+              <option value="plan">Plan</option>
+              <option value="bypassPermissions">Bypass</option>
+            </select>
+          </div>
+          <label class="row toggle-row"><span>Show thinking summaries</span><input
+            type="checkbox" name="show_thinking" class="toggle"></label>
+          <label class="row toggle-row"><span>Name chats with Haiku</span><input
+            type="checkbox" name="auto_titles" class="toggle"></label>
+          <label class="row toggle-row"><span>Show terminal chats</span><input
+            type="checkbox" name="terminal_chats" class="toggle"></label>
+        </section>
+        <section id="remote-section">
+          <h3>Remote</h3>
+          <label class="row toggle-row"><span>Open Viola from my phone</span><input
+            type="checkbox" name="remote" class="toggle"></label>
+          <div class="remote-box" id="remote-box" hidden>
+            <code id="remote-url"></code>
+            <button type="button" class="btn" id="copy-remote">Copy link</button>
+            <button type="button" class="btn" id="reset-remote">Reset link</button>
+          </div>
+          <p class="pop-note" id="remote-note">With Tailscale (recommended), the link works from anywhere, over HTTPS
+            when your tailnet has certificates turned on. Without it, Viola uses your home network, so the phone has to
+            be on the same Wi-Fi and the link isn't encrypted, so only use it on a network you trust. Either way the
+            link carries a secret token that can control this computer, so only send it to yourself.</p>
+        </section>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="settings setup" id="setup">
+    <div class="settings-inner">
+      <div class="settings-head"><h2>Welcome to Viola</h2></div>
+      <div class="settings-body">
+        <p class="setup-intro">Viola runs Claude Code for you and keeps your chats in one window. It needs two things
+          before the first message.</p>
+        <section>
+          <h3><span class="tick" id="tick-claude"></span>Claude Code</h3>
+          <p class="pop-note" id="setup-claude"></p>
+          <div class="setup-install" id="setup-install" hidden>
+            <code id="install-cmd">curl -fsSL https://claude.ai/install.sh | bash</code>
+            <button type="button" class="btn" id="copy-install">Copy</button>
+            <button type="button" class="btn" id="recheck">Check again</button>
+          </div>
+        </section>
+        <section>
+          <h3><span class="tick" id="tick-key"></span>An Anthropic API key</h3>
+          <p class="pop-note">Make one at <a href="https://console.anthropic.com/settings/keys" target="_blank"
+            rel="noreferrer">console.anthropic.com</a> under API keys. It stays on this computer, in Viola's own settings
+            file.</p>
+          <form class="setup-row" id="setup-key-form">
+            <input class="text-input" id="setup-key" type="password" placeholder="sk-ant-…" autocomplete="off">
+            <button class="btn primary" type="submit">Use key</button>
+          </form>
+          <p class="pop-note setup-msg" id="setup-key-msg"></p>
+        </section>
+        <section>
+          <h3>Admin key, if you want the exact balance</h3>
+          <p class="pop-note">You type your balance in once and Viola counts down from it. With an admin key, it counts
+            down by what Anthropic actually billed, including spending outside Viola.</p>
+          <form class="setup-row" id="setup-admin-form">
+            <input class="text-input" id="setup-admin" type="password" placeholder="Optional: admin or org-wide key"
+              autocomplete="off">
+            <button class="btn" type="submit">Add</button>
+          </form>
+          <p class="pop-note setup-msg" id="setup-admin-msg"></p>
+        </section>
+        <div class="setup-done"><button type="button" class="btn primary" id="setup-start"
+          disabled>Start chatting</button></div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="search-dialog" id="search-dialog">
+    <div class="search-head">
+      <button type="button" class="icon-btn search-back" id="close-search" title="Back" data-icon="arrow-left"></button>
+      <div class="search-field" id="search-field">
+        <span class="search-glass" data-icon="search"></span>
+        <input id="search-input" type="search" placeholder="Search chats" autocomplete="off" spellcheck="false"
+          enterkeyhint="search">
+        <button type="button" class="icon-btn search-clear" id="clear-search" title="Clear" data-icon="x"
+          hidden></button>
+      </div>
+    </div>
+    <div class="search-results" id="search-results"></div>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
