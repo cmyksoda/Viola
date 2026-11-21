@@ -378,7 +378,11 @@ button:disabled { cursor: default; }
 .rename-form { display: flex; gap: 0.5rem; padding: 0 0.25rem 0.25rem; }
 .rename-form .text-input { flex: 1; min-width: 0; }
 /* A stroke instead of a heavier weight keeps the title the same width, so it truncates in the same place. */
-.conv.active { background: hsl(var(--border) / 0.1); color: hsl(var(--text-000)); -webkit-text-stroke: 0.02em currentColor; }
+.conv.active {
+  background: hsl(var(--border) / 0.1);
+  color: hsl(var(--text-000));
+  -webkit-text-stroke: 0.02em currentColor;
+}
 .conv-name {
   flex: 1;
   min-width: 0;
@@ -932,6 +936,8 @@ button:disabled { cursor: default; }
   min-height: 2rem;
 }
 .status-line .glyph { font-size: 1.125rem; }
+/* A long verb wraps under itself and pushes the stats onto their own line, beside the glyph rather than below it. */
+.status-text { display: flex; flex-wrap: wrap; align-items: center; column-gap: 0.5rem; min-width: 0; }
 .status-verb { font-weight: 500; }
 .status-stats { color: hsl(var(--text-400)); font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0; }
 

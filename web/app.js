@@ -72,6 +72,11 @@ const GLYPHS = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "�
 const VERBS = [
   "Musing", "Conjuring", "Weaving", "Whittling", "Theorizing", "Making", "Building", "Studying",
   "Reminiscing", "Analyzing", "Engineering", "Disproving the Jacobian Conjecture",
+  "Proving the Riemann Hypothesis", "Formalizing 17 million lines of Lean", "Solving Knuth's 30-year graph problem",
+  "Spotting a pizza topping inside a needle-in-a-haystack", "Playing Pokémon Red for 400 hours",
+  "Selling tungsten cubes at a loss", "Updating my mental model of the user",
+  "Remembering I'm an AI with no physical body", "Considering the ethical implications of this request",
+  "Determining whether this request falls within cybersecurity guidelines",
 ];
 const VERB_SECONDS = 10;
 // Claude Code's own verbs join these once the backend has read them from the installed program.
@@ -835,9 +840,9 @@ function statusLine(msg, text) {
   const el = document.createElement("div");
   el.className = "status-line";
   if (!state.live.verb) pickVerb();
-  el.innerHTML = `<span class="glyph">${GLYPHS[glyphFrame]}</span><span class="status-verb shimmer">${
+  el.innerHTML = `<span class="glyph">${GLYPHS[glyphFrame]}</span><span class="status-text"><span class="status-verb shimmer">${
     escapeHtml(text || `${state.live.verb}…`)
-  }</span><span class="status-stats"></span>`;
+  }</span><span class="status-stats"></span></span>`;
   if (msg) updateStats(el, msg);
   return el;
 }
