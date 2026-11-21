@@ -218,11 +218,12 @@ def shell_key():
 def resolve_api_key(config):
     if config["api_key"]:
         return config["api_key"], "app settings"
-    if os.environ.get(KEY_VARIABLE):
-        return os.environ[KEY_VARIABLE], KEY_VARIABLE
+    # The desktop session's copy of the variable dates from login, so a key since changed in the file wins.
     key, source = shell_key()
     if key:
         return key, source
+    if os.environ.get(KEY_VARIABLE):
+        return os.environ[KEY_VARIABLE], KEY_VARIABLE
     if os.environ.get("ANTHROPIC_API_KEY"):
         return os.environ["ANTHROPIC_API_KEY"], "ANTHROPIC_API_KEY"
     return "", None

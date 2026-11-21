@@ -241,11 +241,14 @@ class Pieces(unittest.TestCase):
         rc.write_text('export VIOLA_API_KEY="sk-from-zshrc"\n')
         try:
             self.assertEqual(server.resolve_api_key({"api_key": ""}), ("sk-from-zshrc", "~/.zshrc"))
-            with mock.patch.dict(os.environ, VIOLA_API_KEY="sk-from-env"):
-                self.assertEqual(server.resolve_api_key({"api_key": ""}), ("sk-from-env", "VIOLA_API_KEY"))
+            # A session started before the file changed still has the old key in its environment.
+            with mock.patch.dict(os.environ, VIOLA_API_KEY="sk-old-from-login"):
+                self.assertEqual(server.resolve_api_key({"api_key": ""}), ("sk-from-zshrc", "~/.zshrc"))
             self.assertEqual(server.resolve_api_key({"api_key": "sk-app"}), ("sk-app", "app settings"))
         finally:
             rc.unlink()
+        with mock.patch.dict(os.environ, VIOLA_API_KEY="sk-from-env"):
+            self.assertEqual(server.resolve_api_key({"api_key": ""}), ("sk-from-env", "VIOLA_API_KEY"))
 
     def test_parent_session_markers(self):
         markers = {"CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "x", "CLAUDE_CODE_CHILD_SESSION": "1"}
