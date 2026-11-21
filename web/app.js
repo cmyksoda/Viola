@@ -76,7 +76,7 @@ const VERBS = [
   "Reminiscing", "Analyzing", "Engineering", "Disproving the Jacobian Conjecture",
   "Proving the Riemann Hypothesis", "Formalizing 17 million lines of Lean", "Solving Knuth's 30-year graph problem",
   "Spotting a pizza topping inside a needle-in-a-haystack", "Playing Pokémon Red for 400 hours",
-  "Selling tungsten cubes at a loss", "Updating my mental model of the user",
+  "Ordering more tungsten cubes for the vending machine", "Updating my mental model of the user",
   "Remembering I'm an AI with no physical body", "Considering the ethical implications of this request",
   "Determining whether this request falls within cybersecurity guidelines",
 ];

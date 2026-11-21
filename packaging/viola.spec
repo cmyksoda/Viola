@@ -21,6 +21,9 @@ Tailscale.
 cp -a %{viola_root}/. %{buildroot}/
 
 %changelog
+* Sat Nov 21 2026 Jaxi - 1.1.0-1
+- Cachebeat, and a key changed in a shell file is used without retyping it
+
 * Sat Nov 21 2026 Jaxi - 1.0.1-1
 - Sidebar swipe on phones, steadier chat titles, more thinking lines
 
