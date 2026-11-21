@@ -19,6 +19,7 @@ Viola keeps Claude Code's input open while it works (`--input-format stream-json
 - **Photo/file upload:** Use the app's + button to open a familiar interface to share photos and files with your assistant. Photos are scaled to 2000px before upload. All uploads are saved in `uploads/`, in [Viola's data folder](#notes).
 - **Permission modes:** The + button also allows you to pick between *Auto, Accept edits, and Plan* modes, as well as giving you the option to *Bypass* permissions entirely.
 - **Prompt caching visibility:** Every turn, see what % was cached.
+- **Cachebeat:** Off by default. Turn it on for a chat in the model menu, and after 50 quiet minutes Viola sends that chat a tiny heartbeat, which re-reads it from the prompt cache before the cache expires. The reply to your next message then reads the conversation from the cache instead of at full price. A heart next to the model name shows it's on. Beats only run while Viola is open, and stop 8 hours after your last reply. Based on [cachebeat](https://github.com/ARahim3/cachebeat) by ARahim3.
 - **Terminal chats in Viola:** Off by default. Allows you to view every Claude Code conversation from your PC in Viola, and continue them inside it.
 - **Assistant naming:** Call Claude a different name? Viola allows you to name your assistant whatever you would like, and reflects this across the app.
 

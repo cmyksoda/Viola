@@ -182,6 +182,72 @@ class Turns(unittest.TestCase):
         self.assertEqual(texts, ["slow"])
 
 
+class Cachebeat(unittest.TestCase):
+    def setUp(self):
+        self.conv = api("POST", "conversations", {"cwd": str(HOME), "cachebeat": True})
+
+    def reply(self):
+        api("POST", f"conversations/{self.conv['id']}/send", {"text": "hi"})
+        events.wait(lambda e: e.get("t") == "turn_end" and e.get("conv_id") == self.conv["id"])
+        return app.store.get(self.conv["id"])
+
+    def test_a_heartbeat_stays_out_of_the_chat(self):
+        conv = self.reply()
+        app.beat(conv)
+        ours = {entry["pid"]: entry["args"] for entry in claude_log() if conv["session_id"] in entry.get("args", [])}
+        beat = [entry for entry in claude_log() if entry["pid"] in ours and "[cachebeat]" in entry.get("stdin", "")]
+        self.assertEqual(len(beat), 1)
+        args = ours[beat[0]["pid"]]
+        self.assertEqual(args[args.index("--resume") + 1], conv["session_id"])
+        self.assertEqual(args[args.index("--model") + 1], conv["model"])
+        self.assertEqual(len(api("GET", f"conversations/{conv['id']}")["messages"]), 2)
+        self.assertNotIn(conv["id"], app.beats)
+        self.assertTrue(conv["cachebeat"])
+        self.assertGreater(conv["beat_at"], 0)
+
+    def test_when_a_beat_is_due(self):
+        start, minute = 1_000_000_000, 60
+        conv = {"id": "x", "cachebeat": True, "session_started": True,
+                "messages": [{"role": "assistant", "ts": start * 1000, "ended": start * 1000}]}
+
+        def due(minutes, beat_minutes=None, **changes):
+            beat_at = {} if beat_minutes is None else {"beat_at": (start + beat_minutes * minute) * 1000}
+            return app.beat_due(dict(conv, **beat_at, **changes), start + minutes * minute)
+
+        self.assertFalse(due(40))
+        self.assertTrue(due(51))
+        # By then the cache has expired, and a beat would only pay to write it again.
+        self.assertFalse(due(59.5))
+        self.assertFalse(due(51, cachebeat=False))
+        self.assertFalse(due(51, beat_minutes=10))
+        self.assertTrue(due(61, beat_minutes=10))
+        # Eight hours after the last reply, the chat is left to go cold.
+        self.assertFalse(due(8 * 60 + 1, beat_minutes=8 * 60 - 50))
+
+    def test_a_message_waits_for_a_heartbeat(self):
+        conv_id = self.conv["id"]
+        with app.store.lock:
+            app.beats[conv_id] = None
+
+        def finish():
+            time.sleep(1)
+            with app.store.lock:
+                app.beats.pop(conv_id)
+                app.beat_done.notify_all()
+
+        threading.Thread(target=finish).start()
+        started = time.time()
+        self.reply()
+        self.assertGreater(time.time() - started, 0.9)
+
+    def test_a_five_minute_cache_turns_it_off(self):
+        conv = self.reply()
+        with mock.patch.object(server, "BEAT_PROMPT", "[cachebeat] short cache"):
+            app.beat(conv)
+        self.assertFalse(conv["cachebeat"])
+        events.wait(lambda e: e.get("t") == "cachebeat_off" and e.get("conv_id") == conv["id"])
+
+
 class LiveSessions(unittest.TestCase):
     def test_only_running_claude_counts(self):
         folder = Path(os.environ["CLAUDE_CONFIG_DIR"]) / "sessions"

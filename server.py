@@ -57,6 +57,15 @@ RESULT_PREVIEW_LIMIT = 30000
 SAVE_INTERVAL = 2.0
 CREDITS_POLL_SECONDS = 300
 SESSIONS_POLL_SECONDS = 60
+# Cachebeat: a chat idle for BEAT_IDLE gets a one-character exchange, re-reading it from the 1-hour prompt cache
+# before it expires. Each beat costs a cached read, so they stop BEAT_HOURS after the last real reply.
+BEAT_POLL_SECONDS = 30
+BEAT_IDLE = 50 * 60
+CACHE_TTL = 60 * 60
+BEAT_HOURS = 8
+BEAT_TIMEOUT = 90
+BEAT_PROMPT = ("[cachebeat] idle heartbeat to keep the prompt cache warm. "
+               "Reply with exactly . and nothing else; no tools.")
 # A chat opens with short tool outputs; the full text loads when a step is expanded.
 PREVIEW_CHARS = 600
 GZIP_MIN_BYTES = 1400
@@ -560,6 +569,7 @@ class Store:
             "cost": conv.get("cost", 0.0),
             "cwd": conv["cwd"],
             "terminal": bool(conv.get("source")),
+            "cachebeat": conv.get("cachebeat", False),
         }
 
     def list(self):
@@ -567,7 +577,7 @@ class Store:
             convs = sorted(self.convs.values(), key=lambda c: c["updated"], reverse=True)
             return [self.summary(c) for c in convs]
 
-    def create(self, config, cwd=None, model=None, effort=None, mode=None):
+    def create(self, config, cwd=None, model=None, effort=None, mode=None, cachebeat=False):
         conv = {
             "id": uuid.uuid4().hex[:12],
             "title": "New chat",
@@ -579,6 +589,7 @@ class Store:
             "model": model or config["model"],
             "effort": effort or config["effort"],
             "permission_mode": mode or config["permission_mode"],
+            "cachebeat": cachebeat,
             "cost": 0.0,
             "cost_seen": 0.0,
             "seq": 0,
@@ -672,6 +683,45 @@ def estimate_cost(model, usage):
             + tokens("cache_read_input_tokens") * read + tokens("output_tokens") * out) / 1e6
 
 
+def claude_command(conv, config):
+    # Heartbeats run the same command as replies: any difference in the request could miss the cache.
+    args = [
+        claude_binary(), "-p",
+        "--input-format", "stream-json", "--replay-user-messages",
+        "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+        "--forward-subagent-text",
+        "--permission-mode", conv_mode(conv, config),
+        "--permission-prompts", "none",
+        "--model", conv["model"],
+        "--effort", conv["effort"],
+    ]
+    if config["show_thinking"]:
+        args += ["--settings", json.dumps({"showThinkingSummaries": True})]
+    if conv["session_started"]:
+        args += ["--resume", conv["session_id"]]
+    else:
+        args += ["--session-id", conv["session_id"]]
+    return args
+
+
+def take_cost(conv, result):
+    """The cost of the request a result reports, which also moves the chat's running total along."""
+    # total_cost_usd is the session's running total, carried over from earlier turns when resuming.
+    total = result.get("total_cost_usd") or 0.0
+    seen = conv.get("cost_seen", 0.0)
+    cost = total - seen if total >= seen else total
+    conv.update(cost_seen=total, cost=conv.get("cost", 0.0) + cost)
+    return cost
+
+
+def last_reply(conv):
+    """When the chat's newest reply ended, in seconds; 0 when it has none."""
+    for msg in reversed(conv.get("messages", [])):
+        if msg.get("role") == "assistant":
+            return (msg.get("ended") or msg.get("ts") or 0) / 1000
+    return 0
+
+
 class Turn:
     """One `claude -p` process answering one user message, plus any sent while it works."""
 
@@ -702,31 +752,10 @@ class Turn:
         event["seq"] = self.conv["seq"]
         self.app.hub.emit(event)
 
-    def command(self):
-        config = self.app.config
-        conv = self.conv
-        args = [
-            claude_binary(), "-p",
-            "--input-format", "stream-json", "--replay-user-messages",
-            "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-            "--forward-subagent-text",
-            "--permission-mode", conv_mode(conv, config),
-            "--permission-prompts", "none",
-            "--model", conv["model"],
-            "--effort", conv["effort"],
-        ]
-        if config["show_thinking"]:
-            args += ["--settings", json.dumps({"showThinkingSummaries": True})]
-        if conv["session_started"]:
-            args += ["--resume", conv["session_id"]]
-        else:
-            args += ["--session-id", conv["session_id"]]
-        return args
-
     def start(self, content, wire):
         self.started = time.time()
         self.proc = subprocess.Popen(
-            self.command(),
+            claude_command(self.conv, self.app.config),
             cwd=chat_folder(self.conv),
             env=child_env(self.app.config),
             stdin=subprocess.PIPE,
@@ -1002,11 +1031,7 @@ class Turn:
     def handle_result(self, event):
         # Background agents can wake the model again later, so one process may report several results.
         self.got_result = True
-        # total_cost_usd is the session's running total, carried over from earlier turns when resuming.
-        total = event.get("total_cost_usd") or 0.0
-        seen = self.conv.get("cost_seen", 0.0)
-        cost = total - seen if total >= seen else total
-        self.conv["cost_seen"] = total
+        cost = take_cost(self.conv, event)
 
         usage = event.get("usage") or {}
         last = (usage.get("iterations") or [usage])[-1]
@@ -1031,7 +1056,6 @@ class Turn:
         else:
             self.result_error = None
 
-        self.conv["cost"] = self.conv.get("cost", 0.0) + cost
         self.calls, self.estimate = {}, 0.0
         self.app.spend(cost)
         if not self.pending:
@@ -1148,6 +1172,9 @@ class App:
         self.sessions_list = []
         self.live = {}
         self.readers = {}
+        # Heartbeat processes by chat, and a signal for a message waiting on one to finish.
+        self.beats = {}
+        self.beat_done = threading.Condition(self.store.lock)
 
         if SESSIONS_CACHE.exists():
             try:
@@ -1157,6 +1184,7 @@ class App:
 
         threading.Thread(target=self.poll_credits, daemon=True).start()
         threading.Thread(target=self.poll_sessions, daemon=True).start()
+        threading.Thread(target=self.poll_cachebeat, daemon=True).start()
 
     def poll_sessions(self):
         while True:
@@ -1368,6 +1396,8 @@ class App:
 
         content, wire = message_content(text, attachments)
         with self.store.lock:
+            # A heartbeat resuming this chat finishes first, so the two can't split the session in half.
+            self.beat_done.wait_for(lambda: conv["id"] not in self.beats, BEAT_TIMEOUT + 10)
             for key, value in (("model", model), ("effort", effort), ("permission_mode", mode)):
                 if value:
                     conv[key] = value
@@ -1422,6 +1452,84 @@ class App:
             self.store.touch(conv)
             if self.config["auto_titles"]:
                 threading.Thread(target=self.make_title, args=(conv, wire), daemon=True).start()
+
+    def poll_cachebeat(self):
+        while not self.closing:
+            time.sleep(BEAT_POLL_SECONDS)
+            for conv in list(self.store.convs.values()):
+                if not self.closing and self.beat_due(conv, time.time()):
+                    self.beat(conv)
+
+    def beat_due(self, conv, now):
+        if not conv.get("cachebeat") or not conv.get("session_started") or conv["id"] in self.turns:
+            return False
+        replied = last_reply(conv)
+        idle = now - max(replied, conv.get("beat_at", 0) / 1000)
+        # Past the TTL the cache has already expired, and a beat would only pay to write it again.
+        return BEAT_IDLE <= idle < CACHE_TTL - 60 and now - replied < BEAT_HOURS * 3600
+
+    def beat(self, conv):
+        """Resumes an idle chat with a one-character exchange that never shows in it, to keep its cache warm."""
+        if conv["session_id"] in self.live_elsewhere():
+            return
+        self.sync(conv)
+        with self.store.lock:
+            if conv["id"] in self.turns or self.store.get(conv["id"]) is not conv:
+                return
+            # Marked before it starts, so a beat that can't run isn't retried every few seconds.
+            conv["beat_at"] = now_ms()
+            try:
+                proc = subprocess.Popen(
+                    claude_command(conv, self.config),
+                    cwd=chat_folder(conv),
+                    env=child_env(self.config),
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    **OWN_GROUP,
+                )
+            except (OSError, ValueError):
+                return
+            self.beats[conv["id"]] = proc
+
+        result = None
+        timer = threading.Timer(BEAT_TIMEOUT, end_tree, (proc,))
+        timer.start()
+        try:
+            message = {"type": "user", "message": {"role": "user", "content": BEAT_PROMPT}}
+            proc.stdin.write((json.dumps(message) + "\n").encode())
+            proc.stdin.flush()
+            for line in proc.stdout:
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                if event.get("type") == "result":
+                    result = event
+                    proc.stdin.close()
+        except (OSError, ValueError):
+            end_tree(proc)
+        proc.wait()
+        timer.cancel()
+
+        with self.store.lock:
+            self.beats.pop(conv["id"], None)
+            self.beat_done.notify_all()
+            if self.store.get(conv["id"]) is not conv:
+                return
+            cost = take_cost(conv, result) if result else 0.0
+            written = ((result or {}).get("usage") or {}).get("cache_creation") or {}
+            # A cache that lasts 5 minutes is gone long before any heartbeat, so beating would only cost.
+            short = bool(written.get("ephemeral_5m_input_tokens") and not written.get("ephemeral_1h_input_tokens"))
+            if short:
+                conv["cachebeat"] = False
+            if conv.get("source"):
+                self.skip_own_writes(conv)
+            self.store.save(conv, force=True)
+        self.spend(cost)
+        if short:
+            self.hub.emit({"t": "conv_meta", "conv": self.store.summary(conv)})
+            self.hub.emit({"t": "cachebeat_off", "conv_id": conv["id"], "title": conv["title"]})
 
     def send_quietly(self, conv, text, attachments=()):
         try:
@@ -1658,6 +1766,8 @@ class App:
         for turn in turns:
             if turn.proc and turn.proc.poll() is None:
                 end_tree(turn.proc)
+        for proc in list(self.beats.values()):
+            end_tree(proc)
         for conv in self.store.convs.values():
             self.store.save(conv, force=True)
 
@@ -1824,7 +1934,8 @@ class Handler(BaseHTTPRequestHandler):
                 mode = body.get("permission_mode")
                 if mode and mode not in MODES:
                     raise ValueError(f"Unknown permission mode: {mode}")
-                conv = app.store.create(app.config, body.get("cwd"), body.get("model"), body.get("effort"), mode)
+                conv = app.store.create(app.config, body.get("cwd"), body.get("model"), body.get("effort"), mode,
+                                        bool(body.get("cachebeat")))
                 return self.send_json(conv)
             if len(parts) >= 2 and parts[0] == "conversations":
                 conv = app.store.get(parts[1])
@@ -1900,6 +2011,8 @@ class Handler(BaseHTTPRequestHandler):
                     conv["permission_mode"] = body["permission_mode"]
                 if body.get("cwd") and not conv["session_started"]:
                     conv["cwd"] = check_folder(body["cwd"])
+                if "cachebeat" in body:
+                    conv["cachebeat"] = bool(body["cachebeat"])
                 app.store.save(conv, force=True)
                 app.hub.emit({"t": "conv_meta", "conv": app.store.summary(conv)})
                 data = json.dumps(light(conv)).encode()
@@ -1909,6 +2022,9 @@ class Handler(BaseHTTPRequestHandler):
             turn = app.turns.get(conv["id"])
             if turn:
                 turn.stop()
+            beat = app.beats.get(conv["id"])
+            if beat:
+                end_tree(beat)
             # The transcript stays in ~/.claude, so keep it from coming back as a terminal chat.
             hidden = app.config["hidden_sessions"]
             if conv["session_id"] not in hidden:

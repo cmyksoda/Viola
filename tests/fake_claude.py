@@ -95,12 +95,15 @@ def pause(seconds):
             waiting.append(event)
 
 
-def finish(text, cost):
+def finish(text, cost, prompt=""):
     global total
     total += cost
+    usage = {"input_tokens": 10, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 0, "output_tokens": 5}
+    if "short cache" in prompt:
+        # Like a session whose cache lasts 5 minutes: everything goes to the short-lived cache.
+        usage["cache_creation"] = {"ephemeral_5m_input_tokens": 100, "ephemeral_1h_input_tokens": 0}
     out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": total,
-         "usage": {"input_tokens": 10, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 0,
-                   "output_tokens": 5}})
+         "usage": usage})
 
 
 def answer(event, first):
@@ -128,7 +131,7 @@ def answer(event, first):
         finish("", 0.002)
         return
     out({"type": "stream_event", "api_message_id": api, "event": {"type": "content_block_stop", "index": 0}})
-    finish("".join(words), 0.001)
+    finish("".join(words), 0.001, prompt)
 
 
 first = True

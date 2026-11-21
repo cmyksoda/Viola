@@ -1214,6 +1214,8 @@ button:disabled { cursor: default; }
 .model-btn:hover { background: hsl(var(--border) / 0.06); }
 .model-btn .ico { width: 0.875rem; height: 0.875rem; color: hsl(var(--text-400)); }
 .effort-tag { color: hsl(var(--text-400)); }
+/* Drawn as a solid shape: at this size a stroked outline fills in the crease between the lobes. */
+.model-btn .beat-heart .ico { width: 1rem; height: 1rem; color: inherit; fill: currentColor; stroke: none; }
 
 .send {
   display: grid;
@@ -1823,8 +1825,8 @@ button:disabled { cursor: default; }
   box-shadow: 0 1px 2px hsl(0 0% 0% / 0.2);
   transition: transform 0.25s var(--ease);
 }
-.toggle:checked { background: hsl(var(--toggle-on, var(--accent))); }
-.toggle:checked::after { transform: translateX(1rem); }
+.toggle:checked, [aria-checked="true"] > .toggle { background: hsl(var(--toggle-on, var(--accent))); }
+.toggle:checked::after, [aria-checked="true"] > .toggle::after { transform: translateX(1rem); }
 
 .toast {
   position: fixed;
@@ -2143,7 +2145,7 @@ button:disabled { cursor: default; }
   background: #c0c0c0;
   box-shadow: var(--raised), var(--lift);
 }
-[data-theme="win95"].mouse :is(.popover > button:hover, .menu-item:hover, .menu-item:hover *:not(.ico)) {
+[data-theme="win95"].mouse :is(.popover > button:hover, .menu-item:hover, .menu-item:hover *:not(.ico, .toggle)) {
   background-color: #000080;
   color: #fff;
   text-shadow: none;
@@ -2232,7 +2234,7 @@ button:disabled { cursor: default; }
   text-shadow: 1px 1px #fff;
 }
 [data-theme="win95"] .toggle { background: #fff; box-shadow: var(--sunken); }
-[data-theme="win95"] .toggle:checked { background: #000080; }
+[data-theme="win95"] :is(.toggle:checked, [aria-checked="true"] > .toggle) { background: #000080; }
 [data-theme="win95"] .toggle::after { background: #c0c0c0; box-shadow: var(--raised); }
 [data-theme="win95"] .icon-preview { background: #008080; }
 [data-theme="win95"] .icon-preview svg { fill: #fff; }

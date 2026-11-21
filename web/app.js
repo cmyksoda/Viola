@@ -36,6 +36,8 @@ const ICONS = {
     '<path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l.9 12a1.5 1.5 0 0 0 1.5 1.5h6.2a1.5 1.5 0 0 0 1.5-1.5l.9-12M9.5 7V4.5h5V7"/>',
   x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
   lock: '<rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+  // Sits low in its box: the lobes carry the weight, so a heart centered by its edges looks too high.
+  heart: '<path d="M12 21.9C9.4 20.2 2.6 15.8 2.6 10.2 2.6 7.4 4.8 5.3 7.5 5.3c1.9 0 3.6 1.1 4.5 3.4.9-2.3 2.6-3.4 4.5-3.4 2.7 0 4.9 2.1 4.9 4.9 0 5.6-6.8 10-9.4 11.7z"/>',
   unlock: '<rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 6.7-1.4"/>',
   shield:
     '<path d="M12 3.5 5.5 6v5.2c0 4 2.7 7.4 6.5 8.8 3.8-1.4 6.5-4.8 6.5-8.8V6z"/><path d="m9.2 11.8 2 2 3.8-3.9"/>',
@@ -1410,8 +1412,13 @@ function handleEvent(ev) {
       renderSidebar();
       if (state.current?.id === ev.conv.id) {
         state.current.title = ev.conv.title;
+        state.current.cachebeat = ev.conv.cachebeat;
         renderTitle();
+        updateComposer();
       }
+      break;
+    case "cachebeat_off":
+      toast(`Cachebeat turned itself off for “${ev.title}”: its cache only lasts 5 minutes, too short for a heartbeat to help.`);
       break;
     case "conv_deleted":
       state.convs = state.convs.filter((c) => c.id !== ev.id);
@@ -1878,6 +1885,7 @@ function updateComposer() {
   const t = target();
   const conv = state.current;
   $("model-label").textContent = modelName(t.model);
+  $("beat-heart").hidden = !t.cachebeat;
   $("effort-label").textContent = EFFORT_LABEL[t.effort] || t.effort || "";
   const locked = !!conv?.session_started;
   $("cwd-label").textContent = shortPath(t.cwd || "~");
@@ -2201,6 +2209,10 @@ function renderModelMenu() {
   if (state.current?.messages.length) {
     html += `<p class="menu-note">Each model keeps its own prompt cache, so switching mid-chat makes the next reply re-read the whole conversation at full price.</p>`;
   }
+  html +=
+    `<div class="menu-sep"></div><button type="button" class="menu-item" role="switch" aria-checked="${!!t.cachebeat}" data-cachebeat="1">` +
+    `<span class="menu-text"><span>Cachebeat</span><span class="menu-sub">Keeps the cache warm over long sessions</span></span>` +
+    `<span class="toggle"></span></button>`;
   const allowed = current?.efforts?.length ? current.efforts : EFFORTS;
   html +=
     `<div class="menu-sep"></div><div class="menu-heading">Effort</div><div class="segmented effort-row"><span class="seg-pill"></span>` +
@@ -2252,6 +2264,11 @@ $("model-menu").addEventListener("click", async (e) => {
   if (btn.dataset.effort) {
     renderModelMenuSelection({ effort: btn.dataset.effort });
     await patchTarget({ effort: btn.dataset.effort });
+  }
+  if (btn.dataset.cachebeat) {
+    const on = btn.getAttribute("aria-checked") !== "true";
+    btn.setAttribute("aria-checked", on);
+    await patchTarget({ cachebeat: on });
   }
 });
 
