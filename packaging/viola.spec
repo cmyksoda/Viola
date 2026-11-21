@@ -21,6 +21,9 @@ Tailscale.
 cp -a %{viola_root}/. %{buildroot}/
 
 %changelog
+* Sat Nov 21 2026 Jaxi - 1.0.1-1
+- Sidebar swipe on phones, steadier chat titles, more thinking lines
+
 * Wed Oct 28 2026 Jaxi - 1.0.0-1
 - First public release: macOS and Windows support, licenses
 

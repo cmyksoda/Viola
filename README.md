@@ -32,8 +32,8 @@ Viola needs [Claude Code](https://docs.claude.com/en/docs/claude-code) and an An
 Download the package for your system from the [latest release](https://github.com/cmyksoda/Viola/releases/latest) and install it. Your package manager will resolve all dependencies (Python 3, GTK 3, WebKit2GTK 4.1):
 
 ```sh
-sudo dnf install ./viola-1.0.0-1.noarch.rpm   # Fedora
-sudo apt install ./viola_1.0.0_all.deb        # Ubuntu, Debian
+sudo dnf install ./viola-1.0.1-1.noarch.rpm   # Fedora
+sudo apt install ./viola_1.0.1_all.deb        # Ubuntu, Debian
 ```
 
 To run from the source folder instead:
@@ -86,7 +86,7 @@ py -m venv .venv
 
 The Android app is a remote for Viola on your computer. Claude Code's own `/remote-control` refuses API keys, so Viola shares its own page with your phone instead.
 
-1. Download `viola-1.0.0.apk` from the [latest release](https://github.com/cmyksoda/Viola/releases/latest) and install it.
+1. Download `viola-1.0.1.apk` from the [latest release](https://github.com/cmyksoda/Viola/releases/latest) and install it.
 2. In Viola on your computer, open Settings → Remote and copy the link. With [Tailscale](https://tailscale.com/) on both devices, the link works from anywhere, over HTTPS when your tailnet has certificates enabled (plain HTTP on the Tailscale IP otherwise). Without Tailscale, Viola listens on your home network instead, so the phone has to be on the same Wi-Fi, and the link isn't encrypted: anyone on that network who can see the traffic could use it to control Viola, and through Viola your computer. Only use it on a network you trust. Sharing on the home network stays off after Viola restarts, since a laptop may be somewhere else by then.
 3. Open the app and paste the link on first launch.
 
