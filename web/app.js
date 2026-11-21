@@ -498,6 +498,71 @@ function toggleSidebar(force) {
   }
 }
 
+// Text fields and anything scrolled sideways keep their own horizontal drags.
+function ownsSideSwipe(el) {
+  for (; el && el !== document.body; el = el.parentElement) {
+    if (el.matches("input, textarea, [contenteditable]") || el.scrollLeft > 0) return true;
+  }
+  return false;
+}
+
+function enableSidebarSwipe() {
+  const app = $("app");
+  const sidebar = $("sidebar");
+  let start = null;
+  let dragging = false;
+  let shown = 0;
+  let last = null;
+  let speed = 0;
+
+  addEventListener("touchstart", (e) => {
+    start = null;
+    if (!isPhone() || e.touches.length > 1 || openPop || document.querySelector("dialog[open]")) return;
+    if (!$("lightbox").hidden) return;
+    const open = app.classList.contains("sidebar-open");
+    if (!open && ownsSideSwipe(e.target)) return;
+    start = { x: e.touches[0].clientX, y: e.touches[0].clientY, open };
+  }, { passive: true });
+
+  addEventListener("touchmove", (e) => {
+    if (!start) return;
+    const x = e.touches[0].clientX;
+    const dx = x - start.x;
+    if (!dragging) {
+      const dy = e.touches[0].clientY - start.y;
+      if (Math.hypot(dx, dy) < 10) return;
+      // A mostly vertical drag is a scroll, and a drawer can only go the way it isn't already.
+      if (Math.abs(dx) < Math.abs(dy) * 1.5 || (dx > 0) === start.open) {
+        start = null;
+        return;
+      }
+      dragging = true;
+      app.classList.add("sidebar-drag");
+      last = { x, t: e.timeStamp };
+    }
+    const width = sidebar.offsetWidth;
+    shown = Math.min(width, Math.max(0, (start.open ? width : 0) + dx));
+    sidebar.style.transform = `translateX(${shown - width}px)`;
+    speed = (x - last.x) / Math.max(1, e.timeStamp - last.t);
+    last = { x, t: e.timeStamp };
+  }, { passive: true });
+
+  const end = (e) => {
+    if (dragging) {
+      // A quick flick decides on its own; a slow drag settles toward whichever side is closer.
+      const flick = Math.abs(speed) > 0.4;
+      const open = e.type === "touchcancel" ? start.open : flick ? speed > 0 : shown > sidebar.offsetWidth / 2;
+      app.classList.remove("sidebar-drag");
+      sidebar.style.transform = "";
+      toggleSidebar(open);
+    }
+    start = null;
+    dragging = false;
+  };
+  addEventListener("touchend", end);
+  addEventListener("touchcancel", end);
+}
+
 const assistantName = () => state.settings.assistant_name?.trim() || "Claude";
 
 function renderProfile() {
@@ -2861,6 +2926,7 @@ function bind() {
   $("collapse-sidebar").onclick = () => toggleSidebar(false);
   $("expand-sidebar").onclick = () => toggleSidebar(true);
   $("scrim").onclick = () => toggleSidebar(false);
+  enableSidebarSwipe();
   $("sheet-scrim").onclick = () => closePopover();
   $("jump").onclick = glideToBottom;
 
